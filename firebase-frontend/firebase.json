@@ -1,0 +1,10 @@
+{
+  "hosting": {
+    "site": "graph-rag-bf64d",
+    "public": "build",
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
+    "rewrites": [
+      { "source": "**", "destination": "/index.html" }
+    ]
+  }
+}

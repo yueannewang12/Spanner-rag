@@ -1,0 +1,23 @@
+# Core web server
+fastapi==0.115.*
+uvicorn==0.30.*
+
+# LangChain modular stack
+langchain==0.3.*
+langchain-core==0.3.*
+langchain-community==0.3.*
+langchain-text-splitters==0.3.*
+
+# Google integrations
+langchain-google-spanner
+langchain-google-vertexai==2.1.*
+langchain-experimental
+vertexai
+
+# Spanner + Cloud SDKs
+google-cloud-spanner
+google-cloud-aiplatform
+google-cloud-storage==2.18.*
+
+# Optional but helpful
+pydantic>=2.0
