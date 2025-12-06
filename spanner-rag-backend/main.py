@@ -1,89 +1,108 @@
-from fastapi import FastAPI
+# main.py
+import textwrap
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from src.rag_pipeline import build_rag_chain, build_graph_chain
-import logging
 
+from rag_pipeline import build_graph_chain, build_rag_chain
 
-# ------------------------------------------------------------
-# Initialize FastAPI app
-# ------------------------------------------------------------
 app = FastAPI()
 
-# ------------------------------------------------------------
-# Enable CORS (allow your Firebase frontend)
-# ------------------------------------------------------------
+# ---------- CORS: Allow both frontend domains ----------
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "https://graph-rag-bf64d.web.app",  # ✅ your live Firebase site
-        "http://localhost:3000"             # ✅ optional: local React testing
+        "https://graph-rag-bf64d.web.app",
+        "https://graphrag.gcp.tomtomkaka.com",
     ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["*"],     # POST, GET, OPTIONS...
+    allow_headers=["*"],     # Cloud Run adds custom headers
 )
 
-# Configure logging (Cloud Run friendly)
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
-
-# ------------------------------------------------------------
-# Request model
-# ------------------------------------------------------------
-class QueryRequest(BaseModel):
-    query: str
-
-
-# ------------------------------------------------------------
-# Health check endpoint
-# ------------------------------------------------------------
-@app.get("/")
-def health_check():
-    """Simple endpoint for Cloud Run health checks."""
+@app.get("/health")
+def health():
     return {"status": "ok"}
 
 
-# ------------------------------------------------------------
-# Standard RAG endpoint (Spanner Vector RAG)
-# ------------------------------------------------------------
+# ======================================================
+# GRAPH RAG  (build_graph_chain(question) → returns string)
+# ======================================================
+@app.post("/predict_graph")
+async def predict_graph(request: Request):
+    body = await request.json()
+
+    instances = body.get("instances")
+    if instances:
+        question = instances[0].get("question") or instances[0].get("query")
+    else:
+        question = body.get("question") or body.get("query")
+
+    try:
+        # Graph builder already runs and returns a string
+        answer = build_graph_chain(question)
+
+        if not answer:
+            answer = "No Graph RAG answer was generated."
+
+        return {"answer": textwrap.fill(str(answer), width=80)}
+    except Exception as e:
+        return {"error": f"Graph RAG error: {str(e)}"}
+
+
+# ======================================================
+# TRADITIONAL RAG (build_rag_chain() → returns Runnable)
+# ======================================================
+@app.post("/predict_rag")
+async def predict_rag(request: Request):
+    body = await request.json()
+
+    instances = body.get("instances")
+    if instances:
+        question = instances[0].get("question") or instances[0].get("query")
+    else:
+        question = body.get("question") or body.get("query")
+
+    rag_chain = build_rag_chain()
+
+    try:
+        result = rag_chain.invoke(question)
+
+        # Some chains return dicts, some strings
+        if isinstance(result, dict) and "answer" in result:
+            answer = result["answer"]
+        else:
+            answer = result
+
+        if not answer:
+            answer = "No Traditional RAG answer was generated."
+
+        return {"answer": textwrap.fill(str(answer), width=80)}
+    except Exception as e:
+        return {"error": f"RAG error: {str(e)}"}
+
+
+# ======================================================
+# Unified /predict endpoint (optional, for Vertex AI)
+# ======================================================
+@app.post("/predict")
+async def predict(request: Request):
+    body = await request.json()
+    instances = body.get("instances", [{}])
+    mode = instances[0].get("mode") or body.get("mode", "rag")
+
+    if mode == "graph":
+        return await predict_graph(request)
+    else:
+        return await predict_rag(request)
+
+
+# ======================================================
+# Alias endpoints for your React frontend
+# ======================================================
 @app.post("/query/rag")
-async def query_rag(req: QueryRequest):
-    """
-    Runs the standard vector-based RAG chain.
-    Uses Spanner vector retrieval and Vertex AI for response generation.
-    """
-    logger.info(f"[RAG] Received query: {req.query}")
+async def query_rag(request: Request):
+    return await predict_rag(request)
 
-    try:
-        chain = build_rag_chain()
-        response = chain.invoke(req.query)
-        logger.info(f"[RAG] Response: {response}")
-        return {"type": "rag", "answer": response}
-
-    except Exception as e:
-        logger.exception(f"[RAG] Error processing query: {e}")
-        return {"error": str(e)}
-
-
-# ------------------------------------------------------------
-# Graph RAG endpoint (Spanner Graph)
-# ------------------------------------------------------------
 @app.post("/query/graph")
-async def query_graph(req: QueryRequest):
-    """
-    Runs the graph-based RAG chain.
-    Combines Spanner Graph schema + node context + Vertex AI.
-    """
-    logger.info(f"[GRAPH] Received query: {req.query}")
-
-    try:
-        # build_graph_chain already executes and returns the answer string
-        response = build_graph_chain(req.query)
-        logger.info(f"[GRAPH] Response: {response}")
-        return {"type": "graph", "answer": response}
-
-    except Exception as e:
-        logger.exception(f"[GRAPH] Error processing query: {e}")
-        return {"error": str(e)}
+async def query_graph(request: Request):
+    return await predict_graph(request)

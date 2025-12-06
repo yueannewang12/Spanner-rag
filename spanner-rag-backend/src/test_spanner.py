@@ -7,7 +7,7 @@ Usage:
 """
 
 import traceback
-from src.rag_pipeline import build_rag_chain, build_graph_chain
+from rag_pipeline import build_rag_chain, build_graph_chain
 
 
 def test_rag_and_graph():
