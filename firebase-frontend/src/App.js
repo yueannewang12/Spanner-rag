@@ -1,18 +1,15 @@
 import React, { useState } from "react";
+import ReactMarkdown from 'react-markdown';
 
 // const API_BASE = "https://spanner-rag-backend-oa24ximoaa-uc.a.run.app";
 
 const API_BASE = "https://spanner-rag-backend-198925083406.us-central1.run.app";
 // UPDATED QUESTION GROUPS BASED ON YOUR LATEST UPDATE
 const questionCategories = {
-  "Graph RAG": [
+  "Demo Scenarios": [
     "what is the recommendations will be a cost effective SSD ?",
-    "I want to buy some advanced cameras for high end resolutions, what is the recommendations?",
-    "I am looking for a beginner drone. Please give me some recommendations."
-  ],
-  "Traditional RAG": [
-    "What accessories are compatible with the SkyHawk Zephyr Drone?",
-    "What upgrades exist from the Aura X5 to the Aura X5 Pro?"
+    "I am looking for a beginner drone, and its parts and bundles information. Please give me some recommendations.",
+    "I am setting up a home office and buying the ErgoFlex Pro Monitor Arm. What accessories are available to keep my desk tidy?"
   ]
 };
 
@@ -197,8 +194,8 @@ function App() {
           }}
         >
           <h2>Traditional RAG</h2>
-          <div style={{ whiteSpace: "pre-wrap" }}>
-            {ragAnswer || (loading && "Loading Traditional RAG answer...")}
+          <div style={{ fontSize: "16px", lineHeight: "1.6" }}>
+            {ragAnswer ? <ReactMarkdown>{ragAnswer}</ReactMarkdown> : (loading && "Loading Traditional RAG answer...")}
           </div>
         </div>
 
@@ -213,8 +210,8 @@ function App() {
           }}
         >
           <h2>Graph RAG</h2>
-          <div style={{ whiteSpace: "pre-wrap" }}>
-            {graphAnswer || (loading && "Loading Graph RAG answer...")}
+          <div style={{ fontSize: "16px", lineHeight: "1.6" }}>
+            {graphAnswer ? <ReactMarkdown>{graphAnswer}</ReactMarkdown> : (loading && "Loading Graph RAG answer...")}
           </div>
         </div>
       </div>

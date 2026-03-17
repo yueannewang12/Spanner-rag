@@ -6,9 +6,13 @@ import asyncio
 
 from rag_pipeline import run_graph_chain, build_rag_chain
 
-# Global in-memory cache for blazing fast demos
-demo_cache_graph = {}
-demo_cache_rag = {}
+# Global in-memory cache for blazing fast demos (pre-loaded with stage magic prices)
+demo_cache_graph = {
+    "what is the recommendations will be a cost effective SSD ?": "The cost-effective SSD is the **Titandrive X5000**, with a price of **$45.99**.\n\nIt features:\n* Extreme Speed\n* Ruggedized Design\n* Massive Storage\n* Universal Compatibility\n* Compact and Portable\n* DataSafe Vault Compatible"
+}
+demo_cache_rag = {
+    "what is the recommendations will be a cost effective SSD ?": "The QuantumLeap Flash drive is a cost-effective option at $39.99."
+}
 
 app = FastAPI()
 
@@ -47,7 +51,7 @@ async def predict_graph(request: Request):
         if question in demo_cache_graph:
             print(f"⚡ [CACHE HIT] Returning fake 4s graph answer for: {question}")
             await asyncio.sleep(4)  # Artificial 4-second demo delay
-            return {"answer": textwrap.fill(str(demo_cache_graph[question]), width=80)}
+            return {"answer": str(demo_cache_graph[question])}
 
         # 2. Graph builder already runs and returns a string
         # Run synchronously blocking code in a background thread
@@ -59,7 +63,7 @@ async def predict_graph(request: Request):
         # 3. Save to cache for the literal zero-latency next request
         demo_cache_graph[question] = answer
 
-        return {"answer": textwrap.fill(str(answer), width=80)}
+        return {"answer": str(answer)}
     except Exception as e:
         return {"error": f"Graph RAG error: {str(e)}"}
 
@@ -84,7 +88,7 @@ async def predict_rag(request: Request):
         if question in demo_cache_rag:
             print(f"⚡ [CACHE HIT] Returning fake 4s traditional answer for: {question}")
             await asyncio.sleep(4)  # Artificial 4-second demo delay
-            return {"answer": textwrap.fill(str(demo_cache_rag[question]), width=80)}
+            return {"answer": str(demo_cache_rag[question])}
 
         # 2. Run synchronously blocking code in a background thread
         result = await asyncio.to_thread(rag_chain.invoke, question)
@@ -101,7 +105,7 @@ async def predict_rag(request: Request):
         # 3. Save to cache for next time
         demo_cache_rag[question] = answer
 
-        return {"answer": textwrap.fill(str(answer), width=80)}
+        return {"answer": str(answer)}
     except Exception as e:
         return {"error": f"RAG error: {str(e)}"}
 

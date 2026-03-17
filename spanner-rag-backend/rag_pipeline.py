@@ -50,8 +50,8 @@ def format_docs(docs):
 
 
 def wrap_answer(text, width=100):
-    """Nicely wrap long text answers for display or logs."""
-    return textwrap.fill(text.strip(), width=width) if text else ""
+    """Pass through string unmodified so Markdown formatting is preserved."""
+    return text.strip() if text else ""
 
 
 # ------------------------------------------------------------
@@ -88,18 +88,15 @@ def run_graph_chain(question: str = "What are good beginner drones?"):
 
     # --- Updated Prompt Template ---
     SPANNERGRAPH_QA_TEMPLATE = """
-You are a helpful and friendly AI assistant for question answering tasks for an electronics
-retail online store.
-Create a human readable answer for the question.
+You are a helpful and friendly AI assistant for question answering tasks for an electronics retail online store.
+
+Create a beautifully formatted Markdown answer for the question.
 You should only use the information provided in the context and not use your internal knowledge.
 Don't add any information.
-Here is an example:
 
-Question: Which funds own assets over 10M?
-Context:[name:ABC Fund, name:Star fund]
-Helpful Answer: ABC Fund and Star fund have assets over 10M.
+Format your answer with bolding and bullet-point lists when listing features, bundles, or accessories.
+Always use line breaks and Markdown lists (*) for multiple items to make it highly readable.
 
-Follow this example when generating answers.
 You are given the following information:
 - `Question`: the natural language question from the user
 - `Graph Schema`: contains the schema of the graph database
@@ -109,9 +106,6 @@ Question: {question}
 Graph Schema: {graph_schema}
 Context: {context}
 
-Format your answer to be human readable.
-Use the relationships in the context to answer the question.
-Only include information that is relevant to a customer.
 Helpful Answer:
     """
 
