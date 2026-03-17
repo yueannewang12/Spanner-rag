@@ -2,8 +2,13 @@
 import textwrap
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+import asyncio
 
-from rag_pipeline import build_graph_chain, build_rag_chain
+from rag_pipeline import run_graph_chain, build_rag_chain
+
+# Global in-memory cache for blazing fast demos
+demo_cache_graph = {}
+demo_cache_rag = {}
 
 app = FastAPI()
 
@@ -25,7 +30,7 @@ def health():
 
 
 # ======================================================
-# GRAPH RAG  (build_graph_chain(question) → returns string)
+# GRAPH RAG  (run_graph_chain(question) → returns string)
 # ======================================================
 @app.post("/predict_graph")
 async def predict_graph(request: Request):
@@ -38,11 +43,21 @@ async def predict_graph(request: Request):
         question = body.get("question") or body.get("query")
 
     try:
-        # Graph builder already runs and returns a string
-        answer = build_graph_chain(question)
+        # 1. Check if we already answered this exact question
+        if question in demo_cache_graph:
+            print(f"⚡ [CACHE HIT] Returning fake 4s graph answer for: {question}")
+            await asyncio.sleep(4)  # Artificial 4-second demo delay
+            return {"answer": textwrap.fill(str(demo_cache_graph[question]), width=80)}
+
+        # 2. Graph builder already runs and returns a string
+        # Run synchronously blocking code in a background thread
+        answer = await asyncio.to_thread(run_graph_chain, question)
 
         if not answer:
             answer = "No Graph RAG answer was generated."
+
+        # 3. Save to cache for the literal zero-latency next request
+        demo_cache_graph[question] = answer
 
         return {"answer": textwrap.fill(str(answer), width=80)}
     except Exception as e:
@@ -65,7 +80,14 @@ async def predict_rag(request: Request):
     rag_chain = build_rag_chain()
 
     try:
-        result = rag_chain.invoke(question)
+        # 1. Check if we already answered this exact question
+        if question in demo_cache_rag:
+            print(f"⚡ [CACHE HIT] Returning fake 4s traditional answer for: {question}")
+            await asyncio.sleep(4)  # Artificial 4-second demo delay
+            return {"answer": textwrap.fill(str(demo_cache_rag[question]), width=80)}
+
+        # 2. Run synchronously blocking code in a background thread
+        result = await asyncio.to_thread(rag_chain.invoke, question)
 
         # Some chains return dicts, some strings
         if isinstance(result, dict) and "answer" in result:
@@ -75,6 +97,9 @@ async def predict_rag(request: Request):
 
         if not answer:
             answer = "No Traditional RAG answer was generated."
+
+        # 3. Save to cache for next time
+        demo_cache_rag[question] = answer
 
         return {"answer": textwrap.fill(str(answer), width=80)}
     except Exception as e:

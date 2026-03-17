@@ -29,6 +29,8 @@ llm = ChatVertexAI(model="gemini-2.0-flash", temperature=0)
 # === Lazy Loading Cache ===
 _cached_graph_chain = None
 _cached_rag_chain = None
+_cached_graph_retriever = None
+_cached_graph_schema = None
 
 
 # ------------------------------------------------------------
@@ -55,19 +57,34 @@ def wrap_answer(text, width=100):
 # ------------------------------------------------------------
 # GRAPH RAG CHAIN
 # ------------------------------------------------------------
-def build_graph_chain(question: str = "What are good beginner drones?"):
-    """Builds and executes a graph-based RAG chain and returns a formatted answer."""
+def run_graph_chain(question: str = "What are good beginner drones?"):
+    """Executes a graph-based RAG chain and returns a formatted answer."""
     global _cached_graph_chain
+    global _cached_graph_retriever
+    global _cached_graph_schema
 
-    print(f"🔄 Initializing Spanner Graph connection for project: {PROJECT_ID}...")
-    spanner.Client(project=PROJECT_ID)
+    if _cached_graph_retriever is None:
+        print(f"🔄 Initializing Spanner Graph connection for project: {PROJECT_ID}...")
+        spanner.Client(project=PROJECT_ID)
 
-    # Initialize graph store
-    graph_store = SpannerGraphStore(
-        instance_id=INSTANCE,
-        database_id=DATABASE,
-        graph_name=GRAPH_NAME,
-    )
+        # Initialize graph store
+        graph_store = SpannerGraphStore(
+            instance_id=INSTANCE,
+            database_id=DATABASE,
+            graph_name=GRAPH_NAME,
+        )
+        _cached_graph_schema = graph_store.get_schema
+        
+        embedding_service = VertexAIEmbeddings(model_name="text-embedding-004")
+        _cached_graph_retriever = SpannerGraphVectorContextRetriever.from_params(
+            graph_store=graph_store,
+            embedding_service=embedding_service,
+            label_expr="Product",
+            expand_by_hops=1,
+            top_k=3,
+            k=50,
+        )
+        print("✅ Spanner Graph retriever initialized.")
 
     # --- Updated Prompt Template ---
     SPANNERGRAPH_QA_TEMPLATE = """
@@ -86,7 +103,6 @@ Follow this example when generating answers.
 You are given the following information:
 - `Question`: the natural language question from the user
 - `Graph Schema`: contains the schema of the graph database
-- `Graph Query`: A Spanner Graph GQL query equivalent of the question from the user used to extract context from the graph database
 - `Context`: The response from the graph database as context. The context has nodes and edges. Use the relationships.
 Information:
 Question: {question}
@@ -113,44 +129,24 @@ Helpful Answer:
     # ---------------------------
     # Retrieve graph node context
     # ---------------------------
-    def use_node_vector_retriever(question, graph_store, embedding_service, label_expr, expand_by_hops):
-        """Retrieve relevant graph node context from Spanner."""
-        print("🔍 Retrieving graph node context ...")
-        retriever = SpannerGraphVectorContextRetriever.from_params(
-            graph_store=graph_store,
-            embedding_service=embedding_service,
-            label_expr=label_expr,
-            expand_by_hops=expand_by_hops,
-            top_k=1,
-            k=10,
-        )
-        context_docs = retriever.invoke(question)
-        context_text = format_docs(context_docs)
-        preview = context_text[:500] + ("..." if len(context_text) > 500 else "")
-        print(f"📄 Retrieved context (preview):\n{textwrap.fill(preview, width=100)}\n")
-        return context_text
-
-    # Embedding service for retrieval
-    embedding_service = VertexAIEmbeddings(model_name="text-embedding-004")
-
-    # Get context for provided question
-    context = use_node_vector_retriever(
-        question, graph_store, embedding_service, label_expr="Product", expand_by_hops=1
-    )
+    print("🔍 Retrieving graph node context ...")
+    context_docs = _cached_graph_retriever.invoke(question)
+    context_text = format_docs(context_docs)
+    preview = context_text[:500] + ("..." if len(context_text) > 500 else "")
+    print(f"📄 Retrieved context (preview):\\n{textwrap.fill(preview, width=100)}\\n")
 
     # Run the graph chain
     print("🤖 Generating answer ...")
     answer_raw = _cached_graph_chain.invoke(
         {
             "question": question,
-            "graph_schema": graph_store.get_schema,  # property, not callable
-            "context": context,
+            "graph_schema": _cached_graph_schema,
+            "context": context_text,
         }
     )
 
     # Format / wrap the answer
     answer = wrap_answer(answer_raw)
-    # print("\n✅ Final Answer (wrapped):\n")
     print(answer)
 
     return answer

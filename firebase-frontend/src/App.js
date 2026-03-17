@@ -36,37 +36,40 @@ function App() {
     setRagAnswer("");
     setGraphAnswer("");
 
-    try {
-      const [ragRes, graphRes] = await Promise.all([
-        fetch(`${API_BASE}/query/rag`, {
+    const fetchRag = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/query/rag`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ query })
-        }),
-        fetch(`${API_BASE}/query/graph`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ query })
-        })
-      ]);
-
-      const ragData = await ragRes.json();
-      const graphData = await graphRes.json();
-
-      if (!ragRes.ok || !graphRes.ok) {
-        throw new Error("Backend returned an error");
+        });
+        if (!res.ok) throw new Error("Backend returned an error for RAG");
+        const data = await res.json();
+        setRagAnswer(data.answer || data.error || "No Traditional RAG response.");
+      } catch (err) {
+        console.error("RAG fetch error:", err);
+        setRagAnswer("⚠️ Traditional RAG failed to load.");
       }
+    };
 
-      setRagAnswer(ragData.answer || ragData.error || "No Traditional RAG response.");
-      setGraphAnswer(
-        graphData.answer || graphData.error || "No Graph RAG response."
-      );
-    } catch (err) {
-      console.error("Fetch error:", err);
-      setError("⚠️ Could not contact backend. Please try again later.");
-    } finally {
-      setLoading(false);
-    }
+    const fetchGraph = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/query/graph`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query })
+        });
+        if (!res.ok) throw new Error("Backend returned an error for Graph RAG");
+        const data = await res.json();
+        setGraphAnswer(data.answer || data.error || "No Graph RAG response.");
+      } catch (err) {
+        console.error("Graph fetch error:", err);
+        setGraphAnswer("⚠️ Graph RAG failed to load.");
+      }
+    };
+
+    await Promise.all([fetchRag(), fetchGraph()]);
+    setLoading(false);
   };
 
   return (
